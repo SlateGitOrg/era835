@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "era835"
+version = "0.1.0"
+description = "X12 835 remittance loader with balancing rules, reversal-chain collapse and bank reconciliation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "era835 contributors" }]
+dependencies = [
+    "polars>=1.0",
+    "pyarrow>=16",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.5",
+    "pyyaml>=6",
+]
+
+[project.scripts]
+era835 = "era835.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/era835"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = [".tmp"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["era835", "x12", "baselines", "conftest"]

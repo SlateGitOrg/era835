@@ -1,0 +1,178 @@
+"""Table schemas, sort keys and partitioning for the warehouse."""
+
+from __future__ import annotations
+
+import polars as pl
+
+S, I64, D = pl.Utf8, pl.Int64, pl.Date
+
+SCHEMAS: dict[str, dict[str, pl.DataType]] = {
+    "remittances": {
+        "remittance_id": S,
+        "source_sha256": S,
+        "isa13": S,
+        "st02": S,
+        "payer_name": S,
+        "payer_id": S,
+        "payee_name": S,
+        "payee_id": S,
+        "trace_number": S,
+        "payment_date": D,
+        "payment_month": S,
+        "production_date": D,
+        "payment_method": S,
+        "bpr02_cents": I64,
+        "claim_count": I64,
+        "plb_total_cents": I64,
+    },
+    "claims": {
+        "claim_id": S,
+        "remittance_id": S,
+        "payment_month": S,
+        "payment_date": D,
+        "payer_name": S,
+        "patient_control_number": S,
+        "status_code": S,
+        "payer_claim_control_number": S,
+        "charge_cents": I64,
+        "paid_cents": I64,
+        "patient_resp_cents": I64,
+        "patient_id": S,
+        "rendering_npi": S,
+        "service_from": D,
+    },
+    "claim_adjustments": {
+        "claim_id": S,
+        "payment_month": S,
+        "seq": I64,
+        "group_code": S,
+        "reason_code": S,
+        "amount_cents": I64,
+        "quantity": S,
+    },
+    "service_lines": {
+        "line_id": S,
+        "claim_id": S,
+        "payment_month": S,
+        "seq": I64,
+        "procedure_qualifier": S,
+        "procedure_code": S,
+        "modifiers": S,
+        "charge_cents": I64,
+        "paid_cents": I64,
+        "allowed_cents": I64,
+        "units": S,
+        "service_date": D,
+    },
+    "line_adjustments": {
+        "line_id": S,
+        "claim_id": S,
+        "payment_month": S,
+        "seq": I64,
+        "group_code": S,
+        "reason_code": S,
+        "amount_cents": I64,
+        "quantity": S,
+    },
+    "provider_adjustments": {
+        "remittance_id": S,
+        "payment_month": S,
+        "seq": I64,
+        "provider_id": S,
+        "period_end": D,
+        "reason_code": S,
+        "reference_id": S,
+        "amount_cents": I64,
+    },
+    "claim_events": {
+        "event_id": S,
+        "load_seq": I64,
+        "remittance_id": S,
+        "payment_month": S,
+        "payment_date": D,
+        "patient_control_number": S,
+        "payer_name": S,
+        "payer_claim_control_number": S,
+        "event_kind": S,
+        "status_code": S,
+        "paid_cents": I64,
+        "patient_resp_cents": I64,
+    },
+    "claim_final": {
+        "patient_control_number": S,
+        "payer_name": S,
+        "final_status": S,
+        "net_paid_cents": I64,
+        "net_patient_resp_cents": I64,
+        "chain_length": I64,
+        "final_claim_control_number": S,
+        "last_payment_date": D,
+        "payment_month": S,
+    },
+    "pending_reversals": {
+        "event_id": S,
+        "remittance_id": S,
+        "payment_month": S,
+        "payment_date": D,
+        "patient_control_number": S,
+        "payer_name": S,
+        "payer_claim_control_number": S,
+        "paid_cents": I64,
+    },
+    "ledger": {
+        "isa13": S,
+        "sha256": S,
+        "file_name": S,
+        "load_seq": I64,
+        "status": S,
+        "remittances_loaded": I64,
+        "remittances_quarantined": I64,
+    },
+    "quarantine": {
+        "file_name": S,
+        "source_sha256": S,
+        "isa13": S,
+        "remittance_id": S,
+        "trace_number": S,
+        "payer_name": S,
+        "payment_month": S,
+        "bpr02_cents": I64,
+        "rule": S,
+        "claim": S,
+        "difference_cents": I64,
+        "detail": S,
+    },
+}
+
+SORT_KEYS: dict[str, list[str]] = {
+    "remittances": ["remittance_id"],
+    "claims": ["claim_id"],
+    "claim_adjustments": ["claim_id", "seq"],
+    "service_lines": ["line_id"],
+    "line_adjustments": ["line_id", "seq"],
+    "provider_adjustments": ["remittance_id", "seq"],
+    "claim_events": ["event_id"],
+    "claim_final": ["patient_control_number"],
+    "pending_reversals": ["event_id"],
+    "ledger": ["load_seq"],
+    "quarantine": ["source_sha256", "remittance_id", "rule", "claim", "detail"],
+}
+
+# Tables written as warehouse/<table>/payment_month=YYYY-MM/part-0.parquet. The rest are
+# a single warehouse/<table>/part-0.parquet.
+PARTITIONED = frozenset(
+    {
+        "remittances",
+        "claims",
+        "claim_adjustments",
+        "service_lines",
+        "line_adjustments",
+        "provider_adjustments",
+        "claim_events",
+        "claim_final",
+        "pending_reversals",
+    }
+)
+
+# Written in this order; the ledger goes last so an interrupted load is re-attempted.
+WRITE_ORDER = [name for name in SCHEMAS if name != "ledger"] + ["ledger"]
